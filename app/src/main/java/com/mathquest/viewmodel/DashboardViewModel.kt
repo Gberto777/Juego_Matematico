@@ -15,8 +15,8 @@ import kotlinx.coroutines.launch
  * Estado de la pantalla de dashboard/progreso.
  *
  * A diferencia de [LoginUiState] (un flujo lineal de pasos mutuamente
- * excluyentes), esta pantalla combina dos preocupaciones concurrentes
- * -la carga inicial de la lista y el envio del formulario del dialogo-,
+ * excluyentes), esta pantalla combina varias preocupaciones concurrentes
+ * -la carga inicial del historial y el envio de altas/ediciones/bajas-,
  * por lo que se modela como un unico data class con banderas
  * independientes en vez de una sealed class de estados excluyentes.
  */
@@ -31,16 +31,16 @@ data class DashboardUiState(
  * ViewModel del dashboard (patron MVVM).
  *
  * Al inicializarse ([init]), dispara automaticamente la consulta GET
- * del progreso del usuario autenticado via [ProgresoRepository]
- * (Retrofit, con el header Authorization inyectado por el interceptor
- * de [com.mathquest.api.RetrofitClient]). El id del usuario se lee de
- * [SessionManager], guardado ahi mismo tras un login exitoso
- * ([com.mathquest.repository.LoginRepository]).
+ * del historial completo de progreso del usuario autenticado via
+ * [ProgresoRepository] (Retrofit, con el header Authorization inyectado
+ * por el interceptor de [com.mathquest.api.RetrofitClient]). El id del
+ * usuario se lee de [SessionManager], guardado ahi mismo tras un login
+ * exitoso ([com.mathquest.repository.LoginRepository]).
  *
- * La API solo expone el registro MAS RECIENTE por usuario (no un
- * listado completo), asi que la "lista" que muestra la UI se construye
- * en el cliente: arranca con ese unico registro (si existe) y crece en
- * memoria con cada POST exitoso durante la sesion actual.
+ * Tras crear/editar/eliminar un registro con exito, la lista en memoria
+ * se actualiza directamente con la respuesta del servidor (en vez de
+ * volver a pedir todo el historial), para una UI mas rapida; el
+ * servidor sigue siendo la fuente de verdad en cada [cargarProgreso].
  */
 class DashboardViewModel @JvmOverloads constructor(
     application: Application,
@@ -69,17 +69,16 @@ class DashboardViewModel @JvmOverloads constructor(
 
         viewModelScope.launch {
             when (val result = progresoRepository.obtenerProgreso(idUsuario)) {
-                is ProgresoRepository.ProgresoResult.Success -> {
+                is ProgresoRepository.ProgresoListResult.Success -> {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        progresos = listOf(result.progreso),
+                        progresos = result.progresos,
                         errorMessage = null
                     )
                 }
-                is ProgresoRepository.ProgresoResult.Failure -> {
+                is ProgresoRepository.ProgresoListResult.Failure -> {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        progresos = emptyList(),
                         errorMessage = result.message
                     )
                 }
@@ -105,6 +104,65 @@ class DashboardViewModel @JvmOverloads constructor(
                     )
                 }
                 is ProgresoRepository.ProgresoResult.Failure -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSubmitting = false,
+                        errorMessage = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Edita un registro existente (icono de lapiz en la lista). Si
+     * tiene exito, reemplaza ese item en la lista con la version
+     * actualizada devuelta por el backend (misma fecha_actualizacion
+     * real, no la del cliente).
+     */
+    fun actualizarProgreso(idRegistro: String, nivelAlcanzado: Int, puntaje: Int) {
+        _uiState.value = _uiState.value.copy(isSubmitting = true, errorMessage = null)
+
+        viewModelScope.launch {
+            when (
+                val result =
+                    progresoRepository.actualizarProgreso(idRegistro, nivelAlcanzado, puntaje)
+            ) {
+                is ProgresoRepository.ProgresoResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSubmitting = false,
+                        progresos = _uiState.value.progresos.map { progreso ->
+                            if (progreso.idRegistro == idRegistro) result.progreso else progreso
+                        }
+                    )
+                }
+                is ProgresoRepository.ProgresoResult.Failure -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSubmitting = false,
+                        errorMessage = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Elimina un registro existente (icono de papelera en la lista, tras
+     * confirmacion en la UI). Si tiene exito, lo quita de la lista local.
+     */
+    fun eliminarProgreso(idRegistro: String) {
+        _uiState.value = _uiState.value.copy(isSubmitting = true, errorMessage = null)
+
+        viewModelScope.launch {
+            when (val result = progresoRepository.eliminarProgreso(idRegistro)) {
+                is ProgresoRepository.AccionResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSubmitting = false,
+                        progresos = _uiState.value.progresos.filterNot {
+                            it.idRegistro == idRegistro
+                        }
+                    )
+                }
+                is ProgresoRepository.AccionResult.Failure -> {
                     _uiState.value = _uiState.value.copy(
                         isSubmitting = false,
                         errorMessage = result.message

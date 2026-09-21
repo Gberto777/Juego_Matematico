@@ -18,31 +18,41 @@ class ProgresoRepository(
     private val apiService: MathQuestApiService = RetrofitClient.apiService
 ) {
 
-    /** Resultado de una operacion de progreso, ya interpretado (sin detalles de HTTP). */
+    /** Resultado de una operacion sobre un unico registro (crear/actualizar). */
     sealed class ProgresoResult {
         data class Success(val progreso: ProgresoResponse) : ProgresoResult()
         data class Failure(val message: String) : ProgresoResult()
     }
 
-    /** Obtiene el registro de progreso mas reciente del usuario indicado. */
-    suspend fun obtenerProgreso(idUsuario: String): ProgresoResult {
+    /** Resultado de obtener el historial completo (lista) de un usuario. */
+    sealed class ProgresoListResult {
+        data class Success(val progresos: List<ProgresoResponse>) : ProgresoListResult()
+        data class Failure(val message: String) : ProgresoListResult()
+    }
+
+    /** Resultado de una operacion sin cuerpo de respuesta (eliminar). */
+    sealed class AccionResult {
+        object Success : AccionResult()
+        data class Failure(val message: String) : AccionResult()
+    }
+
+    /** Obtiene TODO el historial de progreso del usuario indicado (mas reciente primero). */
+    suspend fun obtenerProgreso(idUsuario: String): ProgresoListResult {
         return try {
             val httpResponse = apiService.getProgreso(idUsuario)
             val body = httpResponse.body()
 
-            when {
-                httpResponse.isSuccessful && body != null -> ProgresoResult.Success(body)
-                httpResponse.code() == 404 -> ProgresoResult.Failure(
-                    "Aún no tienes progreso registrado. ¡Usa el botón + para agregar el primero!"
-                )
-                else -> ProgresoResult.Failure(
+            if (httpResponse.isSuccessful && body != null) {
+                ProgresoListResult.Success(body)
+            } else {
+                ProgresoListResult.Failure(
                     "No se pudo obtener el progreso (código ${httpResponse.code()})."
                 )
             }
         } catch (e: IOException) {
-            ProgresoResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+            ProgresoListResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
         } catch (e: Exception) {
-            ProgresoResult.Failure("Ocurrió un error inesperado al obtener el progreso.")
+            ProgresoListResult.Failure("Ocurrió un error inesperado al obtener el progreso.")
         }
     }
 
@@ -69,6 +79,64 @@ class ProgresoRepository(
             ProgresoResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
         } catch (e: Exception) {
             ProgresoResult.Failure("Ocurrió un error inesperado al registrar el progreso.")
+        }
+    }
+
+    /**
+     * Actualiza nivel/puntaje de un registro existente. El backend
+     * responde 404 si el registro no existe o no pertenece al usuario
+     * del token; ese caso se traduce aqui a un mensaje generico (no se
+     * distingue "no existe" de "no es tuyo", igual que el backend).
+     */
+    suspend fun actualizarProgreso(
+        idRegistro: String,
+        nivelAlcanzado: Int,
+        puntaje: Int
+    ): ProgresoResult {
+        return try {
+            val httpResponse = apiService.actualizarProgreso(
+                idRegistro,
+                ProgresoRequest(nivelAlcanzado = nivelAlcanzado, puntaje = puntaje)
+            )
+            val body = httpResponse.body()
+
+            if (httpResponse.isSuccessful && body != null) {
+                ProgresoResult.Success(body)
+            } else if (httpResponse.code() == 404) {
+                ProgresoResult.Failure("Ese registro ya no existe o no te pertenece.")
+            } else {
+                ProgresoResult.Failure(
+                    "No se pudo actualizar el progreso (código ${httpResponse.code()})."
+                )
+            }
+        } catch (e: IOException) {
+            ProgresoResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+        } catch (e: Exception) {
+            ProgresoResult.Failure("Ocurrió un error inesperado al actualizar el progreso.")
+        }
+    }
+
+    /**
+     * Elimina un registro existente. Mismo criterio de propiedad que
+     * [actualizarProgreso]: 404 si no existe o no es del usuario.
+     */
+    suspend fun eliminarProgreso(idRegistro: String): AccionResult {
+        return try {
+            val httpResponse = apiService.eliminarProgreso(idRegistro)
+
+            if (httpResponse.isSuccessful) {
+                AccionResult.Success
+            } else if (httpResponse.code() == 404) {
+                AccionResult.Failure("Ese registro ya no existe o no te pertenece.")
+            } else {
+                AccionResult.Failure(
+                    "No se pudo eliminar el progreso (código ${httpResponse.code()})."
+                )
+            }
+        } catch (e: IOException) {
+            AccionResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+        } catch (e: Exception) {
+            AccionResult.Failure("Ocurrió un error inesperado al eliminar el progreso.")
         }
     }
 }

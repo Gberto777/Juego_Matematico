@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,11 +15,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -28,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,10 +49,12 @@ import com.mathquest.viewmodel.DashboardViewModel
  * Pantalla de destino tras un login exitoso (por email/password o por
  * desbloqueo biometrico).
  *
- * Muestra el progreso del usuario en una [LazyColumn] y permite
- * registrar un nuevo avance (nivel/puntaje) mediante un boton flotante
- * que abre un dialogo modal; al confirmar, el registro se envia a la
- * API (POST /api/progreso) y, si tiene exito, se agrega a la lista.
+ * Muestra el historial de progreso del usuario en una [LazyColumn].
+ * Un boton flotante abre un dialogo modal para registrar un avance
+ * nuevo (POST); cada item de la lista tiene iconos de editar (PUT) y
+ * eliminar (DELETE, con dialogo de confirmacion). Todas las acciones
+ * exitosas refrescan la lista mostrada con la respuesta real del
+ * backend.
  */
 @Composable
 fun DashboardView(
@@ -57,20 +64,29 @@ fun DashboardView(
 
     DashboardContent(
         uiState = uiState,
-        onSubmitProgreso = viewModel::registrarProgreso
+        onCreateProgreso = viewModel::registrarProgreso,
+        onUpdateProgreso = viewModel::actualizarProgreso,
+        onDeleteProgreso = viewModel::eliminarProgreso
     )
 }
 
 @Composable
 private fun DashboardContent(
     uiState: DashboardUiState,
-    onSubmitProgreso: (nivel: Int, puntaje: Int) -> Unit
+    onCreateProgreso: (nivel: Int, puntaje: Int) -> Unit,
+    onUpdateProgreso: (idRegistro: String, nivel: Int, puntaje: Int) -> Unit,
+    onDeleteProgreso: (idRegistro: String) -> Unit
 ) {
-    var showDialog by rememberSaveable { mutableStateOf(false) }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    // ProgresoResponse no es Parcelable, por eso `remember` (no
+    // `rememberSaveable`): perder un dialogo abierto ante un cambio de
+    // configuracion/proceso es un costo aceptable para este alcance.
+    var editingProgreso by remember { mutableStateOf<ProgresoResponse?>(null) }
+    var deletingProgreso by remember { mutableStateOf<ProgresoResponse?>(null) }
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { showDialog = true }) {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Agregar progreso")
             }
         }
@@ -89,7 +105,16 @@ private fun DashboardContent(
                     text = "Mi progreso en MathQuest",
                     style = MaterialTheme.typography.headlineSmall
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                uiState.errorMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 when {
                     uiState.isLoading -> {
@@ -100,8 +125,7 @@ private fun DashboardContent(
 
                     uiState.progresos.isEmpty() -> {
                         Text(
-                            text = uiState.errorMessage
-                                ?: "Aún no tienes progreso registrado. Usa el botón + para agregar uno.",
+                            text = "Aún no tienes progreso registrado. Usa el botón + para agregar uno.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -112,7 +136,11 @@ private fun DashboardContent(
                             contentPadding = PaddingValues(bottom = 80.dp)
                         ) {
                             items(uiState.progresos) { progreso ->
-                                ProgresoItem(progreso)
+                                ProgresoItem(
+                                    progreso = progreso,
+                                    onEditClick = { editingProgreso = progreso },
+                                    onDeleteClick = { deletingProgreso = progreso }
+                                )
                             }
                         }
                     }
@@ -121,47 +149,110 @@ private fun DashboardContent(
         }
     }
 
-    if (showDialog) {
-        NuevoProgresoDialog(
+    if (showAddDialog) {
+        ProgresoFormDialog(
+            title = "Registrar progreso",
             isSubmitting = uiState.isSubmitting,
-            onDismiss = { showDialog = false },
+            onDismiss = { showAddDialog = false },
             onConfirm = { nivel, puntaje ->
-                onSubmitProgreso(nivel, puntaje)
-                showDialog = false
+                onCreateProgreso(nivel, puntaje)
+                showAddDialog = false
+            }
+        )
+    }
+
+    editingProgreso?.let { progreso ->
+        ProgresoFormDialog(
+            title = "Editar progreso",
+            initialNivel = progreso.nivelAlcanzado,
+            initialPuntaje = progreso.puntaje,
+            isSubmitting = uiState.isSubmitting,
+            onDismiss = { editingProgreso = null },
+            onConfirm = { nivel, puntaje ->
+                onUpdateProgreso(progreso.idRegistro, nivel, puntaje)
+                editingProgreso = null
+            }
+        )
+    }
+
+    deletingProgreso?.let { progreso ->
+        AlertDialog(
+            onDismissRequest = { deletingProgreso = null },
+            title = { Text("Eliminar progreso") },
+            text = {
+                Text(
+                    "¿Seguro que quieres eliminar el registro de Nivel " +
+                        "${progreso.nivelAlcanzado} · ${progreso.puntaje} pts? " +
+                        "Esta acción no se puede deshacer."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteProgreso(progreso.idRegistro)
+                    deletingProgreso = null
+                }) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingProgreso = null }) {
+                    Text("Cancelar")
+                }
             }
         )
     }
 }
 
 @Composable
-private fun ProgresoItem(progreso: ProgresoResponse) {
+private fun ProgresoItem(
+    progreso: ProgresoResponse,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Nivel ${progreso.nivelAlcanzado} · ${progreso.puntaje} pts",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = progreso.fechaActualizacion,
-                style = MaterialTheme.typography.bodySmall
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Nivel ${progreso.nivelAlcanzado} · ${progreso.puntaje} pts",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = progreso.fechaActualizacion,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            IconButton(onClick = onEditClick) {
+                Icon(imageVector = Icons.Default.Edit, contentDescription = "Editar progreso")
+            }
+            IconButton(onClick = onDeleteClick) {
+                Icon(imageVector = Icons.Default.Delete, contentDescription = "Eliminar progreso")
+            }
         }
     }
 }
 
 /**
- * Dialogo modal para registrar un nuevo avance. Solo pide Nivel y
- * Puntaje: el id_usuario lo resuelve el backend a partir del JWT, nunca
- * se envia desde aqui (ver ProgresoRequest.kt).
+ * Dialogo modal reutilizado tanto para registrar (campos vacios) como
+ * para editar (campos pre-cargados con [initialNivel]/[initialPuntaje])
+ * un avance. Solo pide Nivel y Puntaje: el id_usuario/id_registro lo
+ * resuelve el llamador, nunca se piden aqui.
  */
 @Composable
-private fun NuevoProgresoDialog(
+private fun ProgresoFormDialog(
+    title: String,
+    initialNivel: Int? = null,
+    initialPuntaje: Int? = null,
     isSubmitting: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (nivel: Int, puntaje: Int) -> Unit
 ) {
-    var nivelText by rememberSaveable { mutableStateOf("") }
-    var puntajeText by rememberSaveable { mutableStateOf("") }
+    var nivelText by rememberSaveable { mutableStateOf(initialNivel?.toString() ?: "") }
+    var puntajeText by rememberSaveable { mutableStateOf(initialPuntaje?.toString() ?: "") }
 
     val nivel = nivelText.toIntOrNull()
     val puntaje = puntajeText.toIntOrNull()
@@ -169,7 +260,7 @@ private fun NuevoProgresoDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
-        title = { Text("Registrar progreso") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -225,13 +316,22 @@ private fun DashboardContentPreview() {
                     ProgresoResponse(
                         idRegistro = "preview-1",
                         idUsuario = "preview-user",
-                        nivelAlcanzado = 5,
-                        puntaje = 980,
-                        fechaActualizacion = "2026-09-18T16:40:00.000Z"
+                        nivelAlcanzado = 7,
+                        puntaje = 1500,
+                        fechaActualizacion = "2026-09-21T14:41:57.000Z"
+                    ),
+                    ProgresoResponse(
+                        idRegistro = "preview-2",
+                        idUsuario = "preview-user",
+                        nivelAlcanzado = 3,
+                        puntaje = 450,
+                        fechaActualizacion = "2026-09-10T10:15:00.000Z"
                     )
                 )
             ),
-            onSubmitProgreso = { _, _ -> }
+            onCreateProgreso = { _, _ -> },
+            onUpdateProgreso = { _, _, _ -> },
+            onDeleteProgreso = { }
         )
     }
 }

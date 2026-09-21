@@ -3,13 +3,14 @@ package com.mathquest.model
 import com.google.gson.annotations.SerializedName
 
 /**
- * Respuesta del backend a GET /api/progreso/{id}.
+ * Representa un unico registro de la tabla `progreso`
+ * (docs/mathquest_init_schema.sql).
  *
- * Espejo de la tabla `progreso` (ver docs/mathquest_init_schema.sql).
- * Se agrega junto con el resto de la capa de red (Sprint 4) para que
- * [com.mathquest.api.MathQuestApiService.getProgreso] tenga un tipo de
- * retorno tipado; el consumo real desde un ViewModel/Repository de
- * progreso se conectara en una iteracion posterior.
+ * Se usa como:
+ *   - Elemento de la lista devuelta por GET /api/progreso/{id}
+ *     (`List<ProgresoResponse>`, el historial completo del usuario).
+ *   - Cuerpo de respuesta de POST /api/progreso y PUT /api/progreso/{id}
+ *     (un solo registro creado/actualizado).
  */
 data class ProgresoResponse(
     @SerializedName("id_registro")
