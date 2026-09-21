@@ -84,4 +84,20 @@ dependencies {
     // usa el ultimo alpha de la serie 1.1, ampliamente usado en produccion
     // para EncryptedSharedPreferences/EncryptedFile.
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Sprint 7: pruebas unitarias (test/, JVM local, sin dispositivo/emulador).
+    testImplementation("junit:junit:4.13.2")
+    // MockK: permite mockear clases Kotlin final (SessionManager, etc.)
+    // sin necesitar marcarlas `open`, a diferencia de Mockito clasico.
+    testImplementation("io.mockk:mockk:1.13.11")
+    // UnconfinedTestDispatcher / runTest / Dispatchers.setMain para
+    // probar codigo basado en viewModelScope + StateFlow de forma
+    // deterministica y sincronica.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    // InstantTaskExecutorRule y utilidades de testing de Architecture
+    // Components. Este proyecto usa StateFlow (no LiveData), por lo que
+    // los tests actuales no la requieren en la practica, pero se agrega
+    // segun lo especificado para el Sprint 7 y queda disponible para
+    // cuando se necesite (ej. si se introduce LiveData mas adelante).
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
 }
