@@ -70,4 +70,11 @@ dependencies {
     // viewModelScope (LoginViewModel) en el dispatcher principal de Android.
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Almacenamiento cifrado (SessionManager) para persistir el token_jwt
+    // usando EncryptedSharedPreferences respaldado por el Android Keystore.
+    // NOTA: la libreria aun no tiene una version 1.x estable "final"; se
+    // usa el ultimo alpha de la serie 1.1, ampliamente usado en produccion
+    // para EncryptedSharedPreferences/EncryptedFile.
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }

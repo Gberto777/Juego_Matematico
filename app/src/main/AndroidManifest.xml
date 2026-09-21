@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Requerido para las llamadas HTTP reales (Retrofit) hacia el backend. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:label="MathQuest"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true">
+        <!--
+            usesCleartextTraffic="true": SOLO para esta fase de pruebas, para
+            permitir trafico HTTP (no HTTPS) hacia http://10.0.2.2:3000 (el
+            backend de desarrollo visto desde el emulador de Android).
+            TODO: eliminar este atributo (o restringirlo via una
+            network-security-config que solo permita cleartext hacia
+            10.0.2.2 en builds debug) antes de cualquier release, y migrar
+            el backend a HTTPS.
+        -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

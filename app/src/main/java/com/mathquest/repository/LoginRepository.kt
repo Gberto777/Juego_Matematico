@@ -15,8 +15,17 @@ import java.io.IOException
  * [RetrofitClient] directamente. Esto facilita sustituir la
  * implementacion (por ejemplo por un fake/mock en tests unitarios del
  * ViewModel) sin tocar la capa de presentacion.
+ *
+ * Como Repository segun el patron clasico, coordina las DOS fuentes de
+ * datos del login: la remota (HTTP via [apiService]) y la local
+ * ([sessionManager], persistencia cifrada del token). Por eso, cuando
+ * el backend confirma credenciales validas, este Repository persiste el
+ * `token_jwt` el mismo antes de devolver [LoginResult.Success]; el
+ * ViewModel no conoce [SessionManager] en absoluto, solo reacciona al
+ * resultado para actualizar el estado de la UI.
  */
 class LoginRepository(
+    private val sessionManager: SessionManager,
     private val apiService: MathQuestApiService = RetrofitClient.apiService
 ) {
 
@@ -38,6 +47,9 @@ class LoginRepository(
             val body = httpResponse.body()
 
             if (httpResponse.isSuccessful && body != null) {
+                // Credenciales validas: persistimos el token de forma
+                // segura antes de reportar el exito al ViewModel.
+                sessionManager.saveToken(body.tokenJwt)
                 LoginResult.Success(body)
             } else {
                 LoginResult.Failure(

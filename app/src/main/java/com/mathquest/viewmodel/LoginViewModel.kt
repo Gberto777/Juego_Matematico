@@ -1,8 +1,10 @@
 package com.mathquest.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mathquest.repository.LoginRepository
+import com.mathquest.repository.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,20 +29,31 @@ sealed class LoginUiState {
  * los campos de entrada como StateFlow, para que LoginView los consuma de
  * forma reactiva mediante collectAsState().
  *
- * El login por email/password ahora delega en [LoginRepository] (patron
+ * El login por email/password delega en [LoginRepository] (patron
  * Repository), que a su vez habla con el backend real via Retrofit
- * ([com.mathquest.api.RetrofitClient]). El ViewModel nunca conoce
- * Retrofit ni la URL base directamente, solo el contrato del Repository.
+ * ([com.mathquest.api.RetrofitClient]) y persiste el token exitoso via
+ * [SessionManager] (EncryptedSharedPreferences). Este ViewModel nunca
+ * conoce Retrofit, la URL base, ni el detalle de cifrado directamente:
+ * solo reacciona al [LoginRepository.LoginResult] para actualizar el
+ * estado de la UI.
+ *
+ * Extiende [AndroidViewModel] (en vez de ViewModel) porque necesita el
+ * Application context para construir el [SessionManager] por defecto
+ * sin arriesgar un leak de Activity/Fragment context.
  *
  * @JvmOverloads es necesario porque la factory por defecto de
  * `viewModel()` (Compose) instancia el ViewModel via reflection buscando
- * un constructor sin argumentos; sin esta anotacion, Kotlin solo emite
- * en bytecode el constructor con el parametro (aunque tenga valor por
- * defecto), y esa instanciacion fallaria en tiempo de ejecucion.
+ * un constructor de un solo parametro (Application); sin esta
+ * anotacion, Kotlin solo emite en bytecode el constructor completo (con
+ * todos los parametros, aunque tengan valor por defecto), y esa
+ * instanciacion fallaria en tiempo de ejecucion.
  */
 class LoginViewModel @JvmOverloads constructor(
-    private val loginRepository: LoginRepository = LoginRepository()
-) : ViewModel() {
+    application: Application,
+    private val loginRepository: LoginRepository = LoginRepository(
+        sessionManager = SessionManager(application)
+    )
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
