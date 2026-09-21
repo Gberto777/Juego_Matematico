@@ -1,31 +1,48 @@
+const pool = require('../config/db');
+
 /**
  * GET /api/progreso/:id
  *
- * MOCK: todavia no consulta la tabla `progreso` real (ver
- * docs/mathquest_init_schema.sql). Devuelve datos de ejemplo para que
- * la app Android tenga un contrato de API estable contra el que
- * integrar mientras se conecta el SQL real.
+ * Consulta la tabla `progreso` real (docs/mathquest_init_schema.sql)
+ * filtrando por id_usuario y devolviendo el registro mas reciente
+ * (fecha_actualizacion DESC), ya que un usuario puede tener varios
+ * registros historicos.
  *
- * IMPORTANTE: las claves del JSON de respuesta deben coincidir EXACTO
- * con @SerializedName en
- * app/src/main/java/com/mathquest/model/ProgresoResponse.kt:
+ * El JSON de respuesta usa las mismas claves que espera la app Android
+ * (@SerializedName en ProgresoResponse.kt):
  *   id_registro, id_usuario, nivel_alcanzado, puntaje, fecha_actualizacion
- *
- * TODO: sustituir el mock por un SELECT real sobre `progreso` filtrando
- * por id_usuario (y probablemente devolviendo el registro mas reciente).
  */
-function getProgreso(req, res) {
+async function getProgreso(req, res) {
   const { id } = req.params;
 
-  const mockProgreso = {
-    id_registro: 'de53531f-2758-4f86-a8e3-3cf89ca32b0a',
-    id_usuario: id,
-    nivel_alcanzado: 5,
-    puntaje: 980,
-    fecha_actualizacion: '2026-09-18T16:40:00.000Z',
-  };
+  try {
+    const { rows } = await pool.query(
+      `SELECT id_registro, id_usuario, nivel_alcanzado, puntaje, fecha_actualizacion
+       FROM progreso
+       WHERE id_usuario = $1
+       ORDER BY fecha_actualizacion DESC
+       LIMIT 1`,
+      [id]
+    );
+    const progreso = rows[0];
 
-  return res.status(200).json(mockProgreso);
+    if (!progreso) {
+      return res.status(404).json({
+        error: 'No se encontró progreso para este usuario.',
+      });
+    }
+
+    return res.status(200).json({
+      id_registro: progreso.id_registro,
+      id_usuario: progreso.id_usuario,
+      nivel_alcanzado: progreso.nivel_alcanzado,
+      puntaje: progreso.puntaje,
+      fecha_actualizacion: new Date(progreso.fecha_actualizacion).toISOString(),
+    });
+  } catch (error) {
+    console.error('Error en GET /api/progreso/:id:', error);
+    return res.status(500).json({ error: 'Error interno del servidor.' });
+  }
 }
 
 module.exports = { getProgreso };
