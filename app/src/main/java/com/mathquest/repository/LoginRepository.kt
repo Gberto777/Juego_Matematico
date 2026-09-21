@@ -5,6 +5,9 @@ import com.mathquest.api.RetrofitClient
 import com.mathquest.model.LoginRequest
 import com.mathquest.model.LoginResponse
 import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 /**
  * Repository de autenticacion (patron Repository de MVVM).
@@ -39,7 +42,9 @@ class LoginRepository(
      * Envia email/password al backend real via Retrofit.
      * Nunca lanza excepciones: cualquier error de red o del servidor se
      * traduce a [LoginResult.Failure] con un mensaje apto para mostrar
-     * en la UI.
+     * en la UI. Las excepciones de red mas comunes (sin Internet, host
+     * inalcanzable, timeout) se atrapan explicitamente para dar un
+     * mensaje mas preciso que el catch generico de IOException.
      */
     suspend fun login(email: String, password: String): LoginResult {
         return try {
@@ -58,10 +63,28 @@ class LoginRepository(
                     "Credenciales inválidas o error del servidor (código ${httpResponse.code()})."
                 )
             }
+        } catch (e: UnknownHostException) {
+            // No se pudo resolver el host del backend: tipicamente el
+            // dispositivo no tiene conexion de red en absoluto.
+            LoginResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: ConnectException) {
+            // No se pudo establecer la conexion TCP (servidor caido,
+            // inalcanzable, o sin red).
+            LoginResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: SocketTimeoutException) {
+            // La conexion o la respuesta tardaron demasiado (red lenta
+            // o inestable).
+            LoginResult.Failure(MENSAJE_SIN_INTERNET)
         } catch (e: IOException) {
-            LoginResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+            // Cualquier otro error de I/O de red no cubierto arriba.
+            LoginResult.Failure(MENSAJE_ERROR_GENERICO)
         } catch (e: Exception) {
-            LoginResult.Failure("Ocurrió un error inesperado al iniciar sesión.")
+            LoginResult.Failure(MENSAJE_ERROR_GENERICO)
         }
+    }
+
+    private companion object {
+        private const val MENSAJE_SIN_INTERNET = "No hay conexión a Internet."
+        private const val MENSAJE_ERROR_GENERICO = "Existe un error. Intenta nuevamente."
     }
 }

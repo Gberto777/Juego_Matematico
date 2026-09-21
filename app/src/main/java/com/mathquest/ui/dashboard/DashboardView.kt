@@ -26,9 +26,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +58,11 @@ import com.mathquest.viewmodel.DashboardViewModel
  * eliminar (DELETE, con dialogo de confirmacion). Todas las acciones
  * exitosas refrescan la lista mostrada con la respuesta real del
  * backend.
+ *
+ * Ademas del texto de error inline (persistente, arriba de la lista),
+ * cada nuevo [DashboardUiState.errorMessage] no nulo dispara un
+ * Snackbar transitorio (ej. errores de red como "No hay conexión a
+ * Internet.", generados en [com.mathquest.repository.ProgresoRepository]).
  */
 @Composable
 fun DashboardView(
@@ -83,8 +91,21 @@ private fun DashboardContent(
     // configuracion/proceso es un costo aceptable para este alcance.
     var editingProgreso by remember { mutableStateOf<ProgresoResponse?>(null) }
     var deletingProgreso by remember { mutableStateOf<ProgresoResponse?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Cada operacion (cargar/crear/editar/eliminar) limpia errorMessage
+    // a null antes de empezar, asi que dos fallos consecutivos con el
+    // MISMO texto igual disparan el Snackbar dos veces (la key pasa por
+    // null en medio).
+    LaunchedEffect(uiState.errorMessage) {
+        val mensaje = uiState.errorMessage
+        if (mensaje != null) {
+            snackbarHostState.showSnackbar(mensaje)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Agregar progreso")

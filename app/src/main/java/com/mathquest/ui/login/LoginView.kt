@@ -13,10 +13,15 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -37,6 +42,11 @@ import com.mathquest.viewmodel.LoginViewModel
  * boton de "Desbloqueo Biométrico" ya dispara el BiometricPrompt real del
  * sistema operativo a traves de [BiometricAuthenticator]; el resultado
  * (exito/fallo) se reporta al [LoginViewModel] para actualizar el estado.
+ *
+ * Ademas del texto de error inline (persistente, junto a los campos),
+ * cada nuevo [LoginUiState.Error] dispara un Snackbar transitorio para
+ * asegurar que el usuario lo note (ej. errores de red como "No hay
+ * conexión a Internet.", generados en [com.mathquest.repository.LoginRepository]).
  */
 @Composable
 fun LoginView(
@@ -67,15 +77,34 @@ fun LoginView(
         }
     }
 
-    LoginContent(
-        email = email,
-        password = password,
-        uiState = uiState,
-        onEmailChange = viewModel::onEmailChange,
-        onPasswordChange = viewModel::onPasswordChange,
-        onLoginClick = viewModel::onLoginClick,
-        onBiometricUnlockClick = onBiometricUnlockClick
-    )
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Se dispara un Snackbar en cada transicion a un LoginUiState.Error
+    // distinto (la key es el propio uiState, y siempre hay un Loading
+    // intermedio entre dos errores del mismo texto, por lo que un
+    // segundo error identico si vuelve a mostrar el Snackbar).
+    LaunchedEffect(uiState) {
+        val estadoActual = uiState
+        if (estadoActual is LoginUiState.Error) {
+            snackbarHostState.showSnackbar(estadoActual.message)
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            LoginContent(
+                email = email,
+                password = password,
+                uiState = uiState,
+                onEmailChange = viewModel::onEmailChange,
+                onPasswordChange = viewModel::onPasswordChange,
+                onLoginClick = viewModel::onLoginClick,
+                onBiometricUnlockClick = onBiometricUnlockClick
+            )
+        }
+    }
 }
 
 @Composable

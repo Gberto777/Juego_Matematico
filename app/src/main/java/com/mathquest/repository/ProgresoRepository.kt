@@ -5,6 +5,9 @@ import com.mathquest.api.RetrofitClient
 import com.mathquest.model.ProgresoRequest
 import com.mathquest.model.ProgresoResponse
 import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 /**
  * Repository de progreso (patron Repository de MVVM).
@@ -13,6 +16,11 @@ import java.io.IOException
  * transporte HTTP. No maneja el token de autenticacion directamente:
  * el interceptor configurado en [RetrofitClient] lo inyecta
  * automaticamente en cada peticion a partir de [SessionManager].
+ *
+ * Las excepciones de red mas comunes (sin Internet, host inalcanzable,
+ * timeout) se atrapan explicitamente en cada metodo para dar un
+ * mensaje mas preciso ("No hay conexión a Internet.") que el catch
+ * generico de errores inesperados ("Existe un error.").
  */
 class ProgresoRepository(
     private val apiService: MathQuestApiService = RetrofitClient.apiService
@@ -49,10 +57,16 @@ class ProgresoRepository(
                     "No se pudo obtener el progreso (código ${httpResponse.code()})."
                 )
             }
+        } catch (e: UnknownHostException) {
+            ProgresoListResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: ConnectException) {
+            ProgresoListResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: SocketTimeoutException) {
+            ProgresoListResult.Failure(MENSAJE_SIN_INTERNET)
         } catch (e: IOException) {
-            ProgresoListResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+            ProgresoListResult.Failure(MENSAJE_ERROR_GENERICO)
         } catch (e: Exception) {
-            ProgresoListResult.Failure("Ocurrió un error inesperado al obtener el progreso.")
+            ProgresoListResult.Failure(MENSAJE_ERROR_GENERICO)
         }
     }
 
@@ -75,10 +89,16 @@ class ProgresoRepository(
                     "No se pudo registrar el progreso (código ${httpResponse.code()})."
                 )
             }
+        } catch (e: UnknownHostException) {
+            ProgresoResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: ConnectException) {
+            ProgresoResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: SocketTimeoutException) {
+            ProgresoResult.Failure(MENSAJE_SIN_INTERNET)
         } catch (e: IOException) {
-            ProgresoResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+            ProgresoResult.Failure(MENSAJE_ERROR_GENERICO)
         } catch (e: Exception) {
-            ProgresoResult.Failure("Ocurrió un error inesperado al registrar el progreso.")
+            ProgresoResult.Failure(MENSAJE_ERROR_GENERICO)
         }
     }
 
@@ -109,10 +129,16 @@ class ProgresoRepository(
                     "No se pudo actualizar el progreso (código ${httpResponse.code()})."
                 )
             }
+        } catch (e: UnknownHostException) {
+            ProgresoResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: ConnectException) {
+            ProgresoResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: SocketTimeoutException) {
+            ProgresoResult.Failure(MENSAJE_SIN_INTERNET)
         } catch (e: IOException) {
-            ProgresoResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+            ProgresoResult.Failure(MENSAJE_ERROR_GENERICO)
         } catch (e: Exception) {
-            ProgresoResult.Failure("Ocurrió un error inesperado al actualizar el progreso.")
+            ProgresoResult.Failure(MENSAJE_ERROR_GENERICO)
         }
     }
 
@@ -133,10 +159,21 @@ class ProgresoRepository(
                     "No se pudo eliminar el progreso (código ${httpResponse.code()})."
                 )
             }
+        } catch (e: UnknownHostException) {
+            AccionResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: ConnectException) {
+            AccionResult.Failure(MENSAJE_SIN_INTERNET)
+        } catch (e: SocketTimeoutException) {
+            AccionResult.Failure(MENSAJE_SIN_INTERNET)
         } catch (e: IOException) {
-            AccionResult.Failure("No se pudo conectar con el servidor. Verifica tu conexión.")
+            AccionResult.Failure(MENSAJE_ERROR_GENERICO)
         } catch (e: Exception) {
-            AccionResult.Failure("Ocurrió un error inesperado al eliminar el progreso.")
+            AccionResult.Failure(MENSAJE_ERROR_GENERICO)
         }
+    }
+
+    private companion object {
+        private const val MENSAJE_SIN_INTERNET = "No hay conexión a Internet."
+        private const val MENSAJE_ERROR_GENERICO = "Existe un error. Intenta nuevamente."
     }
 }
