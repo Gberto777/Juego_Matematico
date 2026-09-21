@@ -21,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mathquest.viewmodel.LoginUiState
 import com.mathquest.viewmodel.LoginViewModel
@@ -31,8 +33,10 @@ import com.mathquest.viewmodel.LoginViewModel
  * Pantalla de login de MathQuest (Jetpack Compose).
  *
  * Se conecta con [LoginViewModel] via StateFlow (email, password, uiState).
- * No contiene logica de red: los clicks solo delegan en el ViewModel, que
- * por ahora simula las transiciones de estado (idle/loading/error/success).
+ * El login por email/password todavia es simulado (sin Retrofit), pero el
+ * boton de "Desbloqueo Biométrico" ya dispara el BiometricPrompt real del
+ * sistema operativo a traves de [BiometricAuthenticator]; el resultado
+ * (exito/fallo) se reporta al [LoginViewModel] para actualizar el estado.
  */
 @Composable
 fun LoginView(
@@ -42,6 +46,27 @@ fun LoginView(
     val email by viewModel.email.collectAsState()
     val password by viewModel.password.collectAsState()
 
+    // El host de BiometricPrompt debe ser un FragmentActivity; MainActivity
+    // ya hereda de FragmentActivity, por lo que el context de Compose
+    // siempre puede castearse aqui de forma segura.
+    val context = LocalContext.current
+    val hostActivity = context as? FragmentActivity
+
+    val onBiometricUnlockClick: () -> Unit = {
+        viewModel.onBiometricUnlockRequested()
+        if (hostActivity != null) {
+            BiometricAuthenticator.authenticate(
+                activity = hostActivity,
+                onSuccess = viewModel::onBiometricAuthSucceeded,
+                onFailure = viewModel::onBiometricAuthFailed
+            )
+        } else {
+            viewModel.onBiometricAuthFailed(
+                "No se pudo iniciar el desbloqueo biométrico. Usa tu contraseña."
+            )
+        }
+    }
+
     LoginContent(
         email = email,
         password = password,
@@ -49,7 +74,7 @@ fun LoginView(
         onEmailChange = viewModel::onEmailChange,
         onPasswordChange = viewModel::onPasswordChange,
         onLoginClick = viewModel::onLoginClick,
-        onBiometricUnlockClick = viewModel::onBiometricUnlockClick
+        onBiometricUnlockClick = onBiometricUnlockClick
     )
 }
 

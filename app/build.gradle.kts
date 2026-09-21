@@ -1,0 +1,63 @@
+// Build file de nivel app para el modulo MathQuest.
+//
+// NOTA: este proyecto todavia no incluye settings.gradle.kts ni el
+// build.gradle.kts raiz (se agregaran en una iteracion posterior de
+// scaffolding de Gradle); este archivo asume que las versiones de los
+// plugins de Android/Kotlin se resuelven desde el proyecto raiz, como es
+// habitual en un proyecto generado por Android Studio.
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.mathquest"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.mathquest"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
+
+    // MainActivity extiende FragmentActivity (requisito de BiometricPrompt
+    // para poder mostrar el dialogo biometrico del sistema).
+    implementation("androidx.fragment:fragment-ktx:1.8.1")
+
+    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Autenticacion biometrica (huella/rostro) mediante el sistema
+    // biometrico seguro del OS (BiometricPrompt + Keystore/TEE). La app
+    // nunca captura, procesa ni almacena datos biometricos: solo recibe
+    // un resultado de exito/fallo/error desde el sistema operativo.
+    implementation("androidx.biometric:biometric:1.1.0")
+}

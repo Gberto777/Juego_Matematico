@@ -72,12 +72,31 @@ class LoginViewModel : ViewModel() {
     }
 
     /**
-     * Punto de entrada para el boton secundario de desbloqueo biometrico.
-     * TODO: integrar androidx.biometric.BiometricPrompt en una iteracion
-     * posterior; por ahora solo deja constancia del cambio de estado.
+     * Se invoca justo antes de mostrar el BiometricPrompt del sistema
+     * (disparado desde LoginView al pulsar "Desbloqueo Biométrico").
      */
-    fun onBiometricUnlockClick() {
+    fun onBiometricUnlockRequested() {
         _uiState.value = LoginUiState.Loading
+    }
+
+    /**
+     * El sistema biometrico seguro del OS valido la huella/rostro como
+     * autentica (BiometricPrompt.AuthenticationCallback#onAuthenticationSucceeded).
+     * La app nunca ve ni almacena la huella en si, solo este resultado.
+     */
+    fun onBiometricAuthSucceeded() {
+        _uiState.value = LoginUiState.Success
+    }
+
+    /**
+     * La huella/rostro fue invalida, no hay biometria enrolada, el
+     * hardware no esta disponible, o el usuario cancelo el prompt. En
+     * todos los casos se deniega el acceso mediante biometria y se
+     * obliga al usuario a autenticarse con el input de contraseña
+     * (que permanece visible y habilitado en LoginView).
+     */
+    fun onBiometricAuthFailed(reason: String) {
+        _uiState.value = LoginUiState.Error(reason)
     }
 
     private fun clearErrorIfPresent() {
