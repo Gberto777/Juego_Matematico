@@ -2,6 +2,7 @@ package com.mathquest.api
 
 import com.mathquest.model.LoginRequest
 import com.mathquest.model.LoginResponse
+import com.mathquest.model.ProgresoRequest
 import com.mathquest.model.ProgresoResponse
 import retrofit2.Response
 import retrofit2.http.Body
@@ -16,6 +17,10 @@ import retrofit2.http.Path
  * hilo de I/O y suspende la corrutina que lo invoca (tipicamente desde
  * viewModelScope en el Repository/ViewModel), sin bloquear el hilo
  * principal.
+ *
+ * [getProgreso] y [crearProgreso] requieren un usuario autenticado: el
+ * header `Authorization: Bearer <token>` se inyecta automaticamente via
+ * el interceptor configurado en [RetrofitClient], no aqui.
  */
 interface MathQuestApiService {
 
@@ -31,4 +36,11 @@ interface MathQuestApiService {
      */
     @GET("/api/progreso/{id}")
     suspend fun getProgreso(@Path("id") idUsuario: String): Response<ProgresoResponse>
+
+    /**
+     * Registra un nuevo avance (nivel alcanzado + puntaje) para el
+     * usuario autenticado (el backend deriva el id_usuario del JWT).
+     */
+    @POST("/api/progreso")
+    suspend fun crearProgreso(@Body request: ProgresoRequest): Response<ProgresoResponse>
 }

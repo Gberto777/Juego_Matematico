@@ -47,9 +47,11 @@ class LoginRepository(
             val body = httpResponse.body()
 
             if (httpResponse.isSuccessful && body != null) {
-                // Credenciales validas: persistimos el token de forma
-                // segura antes de reportar el exito al ViewModel.
-                sessionManager.saveToken(body.tokenJwt)
+                // Credenciales validas: persistimos el token + id_usuario
+                // de forma segura antes de reportar el exito al ViewModel.
+                // El id_usuario se guarda para que DashboardViewModel pueda
+                // pedir el progreso sin volver a decodificar el JWT.
+                sessionManager.saveSession(idUsuario = body.idUsuario, tokenJwt = body.tokenJwt)
                 LoginResult.Success(body)
             } else {
                 LoginResult.Failure(

@@ -53,6 +53,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    // Icons.Default.* (usado por el FAB de DashboardView) vive en este
+    // artefacto separado; material3 no lo trae de forma transitiva.
+    implementation("androidx.compose.material:material-icons-core")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // Autenticacion biometrica (huella/rostro) mediante el sistema
@@ -65,6 +68,10 @@ dependencies {
     // de MathQuest (login, progreso, etc.) desde la capa Repository.
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    // OkHttp se declara explicitamente (ya llega transitivo via Retrofit)
+    // porque RetrofitClient.kt importa clases okhttp3.* directamente
+    // (Interceptor/OkHttpClient) para inyectar el header Authorization.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Necesarios para lanzar las llamadas de red suspendidas desde
     // viewModelScope (LoginViewModel) en el dispatcher principal de Android.

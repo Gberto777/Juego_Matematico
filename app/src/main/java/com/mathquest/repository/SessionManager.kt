@@ -33,24 +33,39 @@ class SessionManager(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    /** Guarda (o sobrescribe) el token JWT de la sesion actual, cifrado. */
-    fun saveToken(tokenJwt: String) {
-        encryptedPrefs.edit().putString(KEY_TOKEN_JWT, tokenJwt).apply()
+    /**
+     * Guarda (o sobrescribe) el token JWT y el id_usuario de la sesion
+     * actual, cifrados. Se guardan juntos porque las pantallas
+     * posteriores (ej. Dashboard) necesitan el id_usuario para pedir su
+     * progreso, y el token para autenticar esa peticion.
+     */
+    fun saveSession(idUsuario: String, tokenJwt: String) {
+        encryptedPrefs.edit()
+            .putString(KEY_TOKEN_JWT, tokenJwt)
+            .putString(KEY_ID_USUARIO, idUsuario)
+            .apply()
     }
 
     /** Devuelve el token JWT persistido, o null si no hay sesion guardada. */
     fun getToken(): String? = encryptedPrefs.getString(KEY_TOKEN_JWT, null)
+
+    /** Devuelve el id_usuario de la sesion persistida, o null si no hay sesion. */
+    fun getUserId(): String? = encryptedPrefs.getString(KEY_ID_USUARIO, null)
 
     /** True si hay un token de sesion persistido. */
     fun isLoggedIn(): Boolean = !getToken().isNullOrBlank()
 
     /** Elimina la sesion persistida (logout). */
     fun clearSession() {
-        encryptedPrefs.edit().remove(KEY_TOKEN_JWT).apply()
+        encryptedPrefs.edit()
+            .remove(KEY_TOKEN_JWT)
+            .remove(KEY_ID_USUARIO)
+            .apply()
     }
 
     companion object {
         private const val PREFS_FILE_NAME = "mathquest_secure_prefs"
         private const val KEY_TOKEN_JWT = "token_jwt"
+        private const val KEY_ID_USUARIO = "id_usuario"
     }
 }
