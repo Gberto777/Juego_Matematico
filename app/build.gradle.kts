@@ -60,4 +60,14 @@ dependencies {
     // nunca captura, procesa ni almacena datos biometricos: solo recibe
     // un resultado de exito/fallo/error desde el sistema operativo.
     implementation("androidx.biometric:biometric:1.1.0")
+
+    // Capa de red (Sprint 4): Retrofit + Gson para consumir la API REST
+    // de MathQuest (login, progreso, etc.) desde la capa Repository.
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+
+    // Necesarios para lanzar las llamadas de red suspendidas desde
+    // viewModelScope (LoginViewModel) en el dispatcher principal de Android.
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

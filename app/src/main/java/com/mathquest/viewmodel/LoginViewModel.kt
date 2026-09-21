@@ -1,9 +1,12 @@
 package com.mathquest.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.mathquest.repository.LoginRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Estados posibles de la pantalla de login.
@@ -24,12 +27,20 @@ sealed class LoginUiState {
  * los campos de entrada como StateFlow, para que LoginView los consuma de
  * forma reactiva mediante collectAsState().
  *
- * NOTA: Todavia no depende de un Repository/API real (Retrofit). La
- * validacion y el "login" actuales son simulados unicamente para conectar
- * el flujo de estados con la UI; se reemplazaran cuando se incorpore la
- * capa de red.
+ * El login por email/password ahora delega en [LoginRepository] (patron
+ * Repository), que a su vez habla con el backend real via Retrofit
+ * ([com.mathquest.api.RetrofitClient]). El ViewModel nunca conoce
+ * Retrofit ni la URL base directamente, solo el contrato del Repository.
+ *
+ * @JvmOverloads es necesario porque la factory por defecto de
+ * `viewModel()` (Compose) instancia el ViewModel via reflection buscando
+ * un constructor sin argumentos; sin esta anotacion, Kotlin solo emite
+ * en bytecode el constructor con el parametro (aunque tenga valor por
+ * defecto), y esa instanciacion fallaria en tiempo de ejecucion.
  */
-class LoginViewModel : ViewModel() {
+class LoginViewModel @JvmOverloads constructor(
+    private val loginRepository: LoginRepository = LoginRepository()
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -51,9 +62,8 @@ class LoginViewModel : ViewModel() {
     }
 
     /**
-     * Simula el intento de inicio de sesion con email/password.
-     * TODO: sustituir por la llamada real a un LoginRepository (Retrofit)
-     * cuando la capa de red este implementada.
+     * Envia el email/password actuales al backend real a traves de
+     * [LoginRepository] (Retrofit) y mapea el resultado al estado de la UI.
      */
     fun onLoginClick() {
         val currentEmail = _email.value
@@ -66,9 +76,16 @@ class LoginViewModel : ViewModel() {
 
         _uiState.value = LoginUiState.Loading
 
-        // Placeholder sin logica de red: se resuelve como exito inmediato
-        // solo para validar el cableado de estados con la vista.
-        _uiState.value = LoginUiState.Success
+        viewModelScope.launch {
+            when (val result = loginRepository.login(currentEmail, currentPassword)) {
+                is LoginRepository.LoginResult.Success -> {
+                    _uiState.value = LoginUiState.Success
+                }
+                is LoginRepository.LoginResult.Failure -> {
+                    _uiState.value = LoginUiState.Error(result.message)
+                }
+            }
+        }
     }
 
     /**
